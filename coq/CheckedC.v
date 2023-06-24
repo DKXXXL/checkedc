@@ -92,6 +92,7 @@ Inductive bound : Set := | Num : Z -> bound | Var : var -> Z -> bound.
 Inductive type : Type :=
   | TInt : type
   | TPtr : mode -> type -> type
+(* This is not in the paper either *)
   | TStruct : struct -> type
   | TArray : bound -> bound -> type -> type
   | TNTArray : bound -> bound -> type -> type.
@@ -147,10 +148,13 @@ Definition venv := Env.t var.
 Definition empty_venv := @Env.empty var.
 
 (* well_bound definition might not needed in the type system, since the new expr_wf will guarantee that. *)
+(* well-bound means a given bound is well-formed
+    i.e. a given variable is in the context *)
 Inductive well_bound_in : env -> bound -> Prop :=
    | well_bound_in_num : forall env n, well_bound_in env (Num n)
    | well_bound_in_var : forall env x y, Env.MapsTo x TInt env -> well_bound_in env (Var x y).
 
+(* like dependent type, it is weird that it is not part of the well_type relationship / type_wf *)
 Inductive well_type_bound_in : env -> type -> Prop :=
    | well_type_bound_in_nat : forall env, well_type_bound_in env TInt
    | well_type_bound_in_ptr : forall m t env, well_type_bound_in env t -> well_type_bound_in env (TPtr m t)
@@ -216,14 +220,18 @@ Inductive no_etype : type -> Prop :=
 Definition fields_wf (D : structdef) (fs : fields) : Prop :=
   forall f t,
     Fields.MapsTo f t fs ->
-    word_type t /\ type_wf D t /\ simple_type t.
+    word_type t /\ type_wf D t 
+    (* this is interesting. Does it mean we don't have variable bound in this formalization ?
+        fascinating! We can redo sigma type and dependent function type here *)
+    /\ simple_type t.
 
 Definition structdef_wf (D : structdef) : Prop :=
   forall (T : struct) (fs : fields),
     StructDef.MapsTo T fs D ->
     fields_wf D fs.
 
-
+(* greater than zero, or know nothing *)
+(* some kind of lattice I guess *)
 Inductive theta_elem : Type := TopElem | GeZero.
 
 (* Theta map in the paper; used for keep tracking Bounds relation in compilation time. *)
@@ -237,6 +245,7 @@ Definition empty_theta := @Theta.empty theta_elem.
 Inductive nat_leq (T:theta) : bound -> bound -> Prop :=
   | nat_leq_num : forall l h, l <= h -> nat_leq T (Num l) (Num h)
   | nat_leq_var : forall x l h, l <= h -> nat_leq T (Var x l) (Var x h)
+  (* some kind of abstract value *)
   | nat_leq_num_var : forall x l h, Theta.MapsTo x GeZero T -> l <= h -> nat_leq T (Num l) (Var x h).
 
 Lemma nat_leq_trans : forall T a b c,  nat_leq T a b -> nat_leq T b c -> nat_leq T a c.
